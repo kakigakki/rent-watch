@@ -21,7 +21,8 @@ jobs:
       - run: npm ci --omit=dev
       - run: node watch.mjs
         env:
-          SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
+          WXPUSHER_TOKEN: ${{ secrets.WXPUSHER_TOKEN }}
+          WXPUSHER_UID: ${{ secrets.WXPUSHER_UID }}
       - name: Save state
         run: |
           git config user.name "github-actions[bot]"

@@ -1,4 +1,4 @@
-// 租房监视：SUUMO / HOME'S 上出现符合条件的新房源或降价时，用 Server酱 推送到微信。
+// 租房监视：SUUMO / HOME'S 上出现符合条件的新房源或降价时，用 WxPusher（免费）推送到微信。
 // 用法：node watch.mjs            正常运行（GitHub Actions 每 30 分钟跑一次）
 //       node watch.mjs --dry-run  只打印，不推送、不写 state.json
 //       node watch.mjs --probe    把各网站的原始 HTML 存到 probe/，用于排查解析问题
@@ -9,7 +9,8 @@ const cfg = JSON.parse(fs.readFileSync(new URL('./config.json', import.meta.url)
 const STATE = new URL('./state.json', import.meta.url);
 const dry = process.argv.includes('--dry-run');
 const probe = process.argv.includes('--probe');
-const sckey = process.env.SERVERCHAN_KEY;
+const wxToken = process.env.WXPUSHER_TOKEN;
+const wxUids = (process.env.WXPUSHER_UID || '').split(',').map((s) => s.trim()).filter(Boolean); // 多人用逗号分隔
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const now = new Date();
@@ -182,13 +183,22 @@ function line(r, tag) {
 }
 async function push(title, body) {
   console.log(`\n=== ${title} ===\n${body}\n`);
-  if (dry || !sckey) { if (!sckey && !dry) console.warn('SERVERCHAN_KEY 未设置，跳过推送'); return; }
-  const res = await fetch(`https://sctapi.ftqq.com/${sckey}.send`, {
-    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ title: title.slice(0, 32), desp: body }),
-  });
-  const j = await res.json().catch(() => ({}));
-  if (j.code !== 0) console.error('Server酱推送失败:', JSON.stringify(j));
+  if (dry || !wxToken || !wxUids.length) { if (!dry) console.warn('WXPUSHER_TOKEN / WXPUSHER_UID 未设置，跳过推送'); return; }
+  // WxPusher：content 上限 40000 字，超过就按房源分条发送
+  const parts = [], blocks = body.split('\n\n---\n\n');
+  for (const b of blocks) {
+    if (parts.length && parts.at(-1).length + b.length < 30000) parts[parts.length - 1] += '\n\n---\n\n' + b;
+    else parts.push(b);
+  }
+  for (const [i, part] of parts.entries()) {
+    const t = parts.length > 1 ? `${title}（${i + 1}/${parts.length}）` : title;
+    const res = await fetch('https://wxpusher.zjiecode.com/api/send/message', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appToken: wxToken, uids: wxUids, contentType: 3, summary: t.slice(0, 100), content: `## ${t}\n\n${part}` }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (j.code !== 1000) console.error('WxPusher 推送失败:', j.code, j.msg);
+  }
 }
 
 // ---------- 主流程 ----------

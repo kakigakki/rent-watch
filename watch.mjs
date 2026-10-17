@@ -183,7 +183,11 @@ function line(r, tag) {
 }
 async function push(title, body) {
   console.log(`\n=== ${title} ===\n${body}\n`);
-  if (dry || !wxToken || !wxUids.length) { if (!dry) console.warn('WXPUSHER_TOKEN / WXPUSHER_UID 未设置，跳过推送'); return; }
+  if (dry) return;
+  if (!wxToken || !wxUids.length) {
+    console.error(`推送跳过：WXPUSHER_TOKEN ${wxToken ? '有' : '未设置'}，WXPUSHER_UID ${wxUids.length ? `${wxUids.length} 个` : '未设置'}`);
+    return;
+  }
   // WxPusher：content 上限 40000 字，超过就按房源分条发送
   const parts = [], blocks = body.split('\n\n---\n\n');
   for (const b of blocks) {
@@ -197,8 +201,15 @@ async function push(title, body) {
       body: JSON.stringify({ appToken: wxToken, uids: wxUids, contentType: 3, summary: t.slice(0, 100), content: `## ${t}\n\n${part}` }),
     });
     const j = await res.json().catch(() => ({}));
-    if (j.code !== 1000) console.error('WxPusher 推送失败:', j.code, j.msg);
+    const mask = (u) => String(u).slice(0, 8) + '…';
+    const per = (Array.isArray(j.data) ? j.data : []).map((d) => `${mask(d.uid)} ${d.status ?? ''}${d.code != null ? ` (code ${d.code})` : ''}`).join('；');
+    console.log(`WxPusher 回应：HTTP ${res.status} code=${j.code} msg=${j.msg ?? ''} ${per}`);
+    if (j.code !== 1000) console.error('WxPusher 推送失败');
   }
+}
+if (process.argv.includes('--test-push')) {
+  await push('租房监视 测试消息', `这是一条测试消息，收到说明推送正常。\n\n${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`);
+  process.exit(0);
 }
 
 // ---------- 主流程 ----------

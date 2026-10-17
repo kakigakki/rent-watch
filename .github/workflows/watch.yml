@@ -1,0 +1,30 @@
+name: rent-watch
+on:
+  schedule:
+    - cron: "13,43 * * * *" # 每 30 分钟（UTC，GitHub 高峰期可能延迟）
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: rent-watch
+  cancel-in-progress: false
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --omit=dev
+      - run: node watch.mjs
+        env:
+          SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
+      - name: Save state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state.json
+          git diff --cached --quiet || (git commit -m "Update state" && git push)

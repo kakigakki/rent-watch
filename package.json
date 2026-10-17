@@ -1,0 +1,17 @@
+{
+  "name": "rent-watch",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "start": "node watch.mjs",
+    "dry-run": "node watch.mjs --dry-run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "cheerio": "1.0.0"
+  },
+  "private": true
+}

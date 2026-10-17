@@ -1,0 +1,285 @@
+{
+ "rooms": {
+  "藤沢市鵠沼神明|2LDK|66.8|1": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 125000,
+   "parking": {
+    "fee": 0,
+    "ok": true,
+    "text": "付無料"
+   },
+   "name": "サンフラット湘南II",
+   "url": "https://suumo.jp/chintai/jnc_000110506243/"
+  },
+  "藤沢市辻堂元町|2LDK|59.4|1": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 128000,
+   "parking": {
+    "fee": 0,
+    "ok": true,
+    "text": "付無料"
+   },
+   "name": "KONKO1",
+   "url": "https://suumo.jp/chintai/jnc_000110449065/"
+  },
+  "藤沢市藤沢|2SLDK|66.2|1": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "parking": {
+    "fee": 13000,
+    "ok": false,
+    "text": "近隣110m13000円"
+   },
+   "total": 133000,
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "excluded": true
+  },
+  "藤沢市藤が岡|2LDK|63.4|2": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 142000,
+   "parking": {
+    "fee": 8800,
+    "ok": true,
+    "text": "敷地内8800円"
+   },
+   "name": "エレガントヴィラ",
+   "url": "https://suumo.jp/chintai/jnc_000110185107/"
+  },
+  "藤沢市藤が岡|2LDK|62.2|1": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 144000,
+   "parking": {
+    "fee": 8800,
+    "ok": true,
+    "text": "敷地内8800円"
+   },
+   "name": "エレガントヴィラ",
+   "url": "https://suumo.jp/chintai/jnc_000108904567/"
+  },
+  "藤沢市藤が岡|2LDK|62.2|2": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 148000,
+   "parking": {
+    "fee": null,
+    "ok": true,
+    "text": "-"
+   },
+   "name": "エレガントヴィラ",
+   "url": "https://suumo.jp/chintai/jnc_000109096616/"
+  },
+  "藤沢市藤が岡|2LDK|63.4|1": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 144000,
+   "parking": {
+    "fee": 8800,
+    "ok": true,
+    "text": "敷地内8800円"
+   },
+   "name": "JR東海道本線 藤沢駅 5階建 築14年",
+   "url": "https://suumo.jp/chintai/jnc_000109291269/"
+  },
+  "藤沢市大庭|2LDK|56.4|1": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 100000,
+   "parking": {
+    "fee": 9900,
+    "ok": true,
+    "text": "敷地内9900円"
+   },
+   "name": "【新築ペット可シャーメゾン】ボヌール",
+   "url": "https://suumo.jp/chintai/jnc_000109898076/"
+  },
+  "藤沢市大庭|2LDK|59.2|2": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 130000,
+   "parking": {
+    "fee": 9900,
+    "ok": true,
+    "text": "敷地内9900円"
+   },
+   "name": "小田急江ノ島線 善行駅 3階建 築9年",
+   "url": "https://suumo.jp/chintai/jnc_000108062483/"
+  },
+  "藤沢市村岡東|2LDK|71.8|2": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 125000,
+   "parking": {
+    "fee": 8800,
+    "ok": true,
+    "text": "敷地内8800円"
+   },
+   "name": "サンハイツ高谷",
+   "url": "https://suumo.jp/chintai/jnc_000110533900/"
+  },
+  "藤沢市大庭|2LDK|61.4|2": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 111000,
+   "parking": {
+    "fee": 8800,
+    "ok": true,
+    "text": "敷地内8800円"
+   },
+   "name": "新築藤沢大庭アパート",
+   "url": "https://suumo.jp/chintai/jnc_000110246461/"
+  },
+  "藤沢市鵠沼桜が岡|2LDK|60.2|2": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 149000,
+   "parking": {
+    "fee": 0,
+    "ok": true,
+    "text": "付無料"
+   },
+   "name": "桜館",
+   "url": "https://suumo.jp/chintai/jnc_000106967700/"
+  },
+  "藤沢市大庭|2LDK|65.5|2": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 145500,
+   "parking": {
+    "fee": 9900,
+    "ok": true,
+    "text": "敷地内9900円"
+   },
+   "name": "アリエッタ",
+   "url": "https://suumo.jp/chintai/jnc_000110346351/"
+  },
+  "藤沢市羽鳥|2LDK|60.2|1": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 126000,
+   "parking": {
+    "fee": 0,
+    "ok": true,
+    "text": "付無料"
+   },
+   "name": "JR東海道本線 辻堂駅 2階建 築14年",
+   "url": "https://suumo.jp/chintai/jnc_000110440906/"
+  },
+  "藤沢市宮前|2LDK|62.5|1": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 147000,
+   "parking": {
+    "fee": 9900,
+    "ok": true,
+    "text": "敷地内9900円"
+   },
+   "name": "フレジェ",
+   "url": "https://suumo.jp/chintai/jnc_000109461325/"
+  },
+  "藤沢市宮前|2LDK|61.1|1": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 150000,
+   "parking": {
+    "fee": 9900,
+    "ok": true,
+    "text": "敷地内9900円"
+   },
+   "name": "フレジェ",
+   "url": "https://suumo.jp/chintai/jnc_000109461327/"
+  },
+  "藤沢市大庭|2LDK|56.3|1": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 116000,
+   "parking": {
+    "fee": 8800,
+    "ok": true,
+    "text": "敷地内8800円"
+   },
+   "name": "SAKAYA QUARTET",
+   "url": "https://suumo.jp/chintai/jnc_000110278084/"
+  },
+  "藤沢市大庭|2LDK|61.2|1": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 150000,
+   "parking": {
+    "fee": 0,
+    "ok": true,
+    "text": "付無料"
+   },
+   "name": "メゾン・ユニカ湘南",
+   "url": "https://suumo.jp/chintai/jnc_000109683739/"
+  },
+  "茅ヶ崎市松が丘|3LDK|71.6|2": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 135000,
+   "parking": {
+    "fee": 11000,
+    "ok": true,
+    "text": "敷地内11000円"
+   },
+   "name": "ソレアードAII",
+   "url": "https://suumo.jp/chintai/jnc_000067029910/"
+  },
+  "茅ヶ崎市菱沼|2LDK|59.2|3": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 130000,
+   "parking": {
+    "fee": 10780,
+    "ok": true,
+    "text": "近隣130m10780円"
+   },
+   "name": "プルメリア・グレイス",
+   "url": "https://suumo.jp/chintai/jnc_000110376213/"
+  },
+  "茅ヶ崎市室田|2LDK|57.6|2": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 97500,
+   "parking": {
+    "fee": 6600,
+    "ok": true,
+    "text": "敷地内6600円"
+   },
+   "name": "ヴァンベール",
+   "url": "https://suumo.jp/chintai/jnc_000110097780/"
+  },
+  "茅ヶ崎市本村|2LDK|58.0|1": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 129700,
+   "parking": {
+    "fee": 9900,
+    "ok": true,
+    "text": "敷地内9900円"
+   },
+   "name": "JR東海道本線 茅ケ崎駅 3階建 築6年",
+   "url": "https://suumo.jp/chintai/jnc_000110058896/"
+  },
+  "茅ヶ崎市赤羽根|2LDK|57.5|1": {
+   "firstSeen": "2026-10-17T02:09:46.466Z",
+   "lastSeen": "2026-10-17T02:09:46.466Z",
+   "total": 148000,
+   "parking": {
+    "fee": 0,
+    "ok": true,
+    "text": "付無料/平置駐"
+   },
+   "name": "ドマーニ辻堂",
+   "url": "https://suumo.jp/chintai/jnc_000107717491/"
+  }
+ },
+ "fail": {
+  "SUUMO": 0,
+  "HOME'S": 0
+ },
+ "initializedAt": "2026-10-17T02:09:46.466Z",
+ "lastRun": "2026-10-17T02:09:46.466Z"
+}

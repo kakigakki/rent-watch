@@ -173,32 +173,57 @@ async function scanHomes() {
   return out;
 }
 
-// ---------- 推送 ----------
+// ---------- 推送（WxPusher，HTML 卡片） ----------
 const man = (n) => (n / 10000).toFixed(2).replace(/\.?0+$/, '');
-function line(r, tag) {
-  const p = r.parking.fee == null ? `停车费未确认（${r.parking.text}）` : `停车${r.parking.fee.toLocaleString()}円`;
-  return `**${tag}** ${r.name}  \n${z2h(r.address).replace(/^神奈川県/, '')}｜${r.layout} ${r.area}㎡｜${r.built}｜${r.floor}  \n` +
-    `月租+管理费 **${man(r.total)}万**（含停车 ${man(r.total + (r.parking.fee || 0))}万）｜${p}  \n${r.access}  \n` +
-    r.urls.map((u) => `[${u.site}](${u.url})`).join(' ');
+const h = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const TAG_COLOR = { 新房源: '#2f7a68', 在招: '#5f6d68', 重新招租: '#1f5f7a' }; // 其他（降价）= 橙色
+// 「JR東海道本線 辻堂駅 2階建 築14年」这类是中介没写楼名时 SUUMO 自动生成的标题
+const displayName = (r) => (/駅 \d+階建|^\S+線 \S+駅/.test(r.name) ? '（楼名未公开）' : r.name);
+const shortAccess = (a) => z2h(a).replace(/^[^/]*\//, '').replace(/\(バス停\)/, '').replace(/\s*（.*$/, '');
+const areaName = (r) => townOf(r.address).replace(/^.+?[市町]/, '');
+function card(r, tag) {
+  const pf = r.parking.fee;
+  const park = pf == null ? '<span style="color:#a8741a">停车费待确认</span>'
+    : pf === 0 ? '<b style="color:#2f7a68">停车免费</b>' : `停车 ${pf.toLocaleString()}円`;
+  const sites = [...new Set(r.urls.map((u) => u.site))].map((site) => {
+    const n = r.urls.filter((u) => u.site === site).length;
+    const url = r.urls.find((u) => u.site === site).url;
+    return `<a href="${h(url)}" style="display:inline-block;margin:6px 8px 0 0;padding:4px 12px;border:1px solid #1f5f7a;border-radius:14px;color:#1f5f7a;text-decoration:none;font-size:13px">${h(site)}${n > 1 ? ` ×${n}` : ''} ›</a>`;
+  }).join('');
+  return `<div style="border:1px solid #dde3dd;border-radius:10px;padding:10px 12px;margin:10px 0;background:#fff">`
+    + `<div style="font-size:12px;font-weight:bold;color:${TAG_COLOR[tag] || '#c0562a'}">${h(tag)}</div>`
+    + `<div style="font-size:16px;font-weight:bold;margin:2px 0">${h(displayName(r))}</div>`
+    + `<div style="font-size:12px;color:#5f6d68">${h(z2h(r.address).replace(/^神奈川県/, ''))}　${h(shortAccess(r.access))}</div>`
+    + `<div style="margin:6px 0 2px"><span style="font-size:22px;font-weight:bold;color:#c0562a">${man(r.total)}</span><span style="font-size:13px;color:#c0562a">万</span>`
+    + `<span style="font-size:12px;color:#5f6d68">　含停车 ${man(r.total + (pf || 0))}万</span></div>`
+    + `<div style="font-size:14px"><b>${h(r.layout)}</b> · ${r.area}㎡ · ${h(r.built)} · ${h(r.floor)} · ${park}</div>`
+    + sites + '</div>';
 }
-async function push(title, body) {
-  console.log(`\n=== ${title} ===\n${body}\n`);
+const introBox = (lines) => `<div style="font-size:13px;color:#5f6d68;line-height:1.6;margin-bottom:4px">${lines.join('<br>')}</div>`;
+async function push(title, intro, cards = []) {
+  const plain = (s) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  console.log(`\n=== ${title} ===\n${plain(intro)}\n${cards.map(plain).join('\n')}\n`);
+  if (probe) {
+    fs.mkdirSync(new URL('./probe/', import.meta.url), { recursive: true });
+    fs.writeFileSync(new URL('./probe/message.html', import.meta.url), `<meta charset="utf-8"><meta name="viewport" content="width=device-width"><body style="background:#f4f6f4;font-family:sans-serif;max-width:480px;margin:auto;padding:12px"><h3>${h(title)}</h3>${intro}${cards.join('')}`);
+  }
   if (dry) return;
   if (!wxToken || !wxUids.length) {
     console.error(`推送跳过：WXPUSHER_TOKEN ${wxToken ? '有' : '未设置'}，WXPUSHER_UID ${wxUids.length ? `${wxUids.length} 个` : '未设置'}`);
     return;
   }
-  // WxPusher：content 上限 40000 字，超过就按房源分条发送
-  const parts = [], blocks = body.split('\n\n---\n\n');
-  for (const b of blocks) {
-    if (parts.length && parts.at(-1).length + b.length < 30000) parts[parts.length - 1] += '\n\n---\n\n' + b;
-    else parts.push(b);
+  // WxPusher：content 上限 40000 字 / 65535 字节，超过就分条
+  const parts = [[]];
+  for (const c of cards) {
+    if (parts.at(-1).length && Buffer.byteLength(parts.at(-1).join('') + c) > 45000) parts.push([]);
+    parts.at(-1).push(c);
   }
   for (const [i, part] of parts.entries()) {
     const t = parts.length > 1 ? `${title}（${i + 1}/${parts.length}）` : title;
+    const html = `<div style="font-family:-apple-system,sans-serif;color:#1a2422">${i === 0 ? intro : ''}${part.join('')}</div>`;
     const res = await fetch('https://wxpusher.zjiecode.com/api/send/message', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ appToken: wxToken, uids: wxUids, contentType: 3, summary: t.slice(0, 100), content: `## ${t}\n\n${part}` }),
+      body: JSON.stringify({ appToken: wxToken, uids: wxUids, contentType: 2, summary: t.slice(0, 100), content: html }),
     });
     const j = await res.json().catch(() => ({}));
     const mask = (u) => String(u).slice(0, 8) + '…';
@@ -208,14 +233,14 @@ async function push(title, body) {
   }
 }
 if (process.argv.includes('--test-push')) {
-  await push('租房监视 测试消息', `这是一条测试消息，收到说明推送正常。\n\n${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`);
+  await push('租房监视 测试消息', introBox(['这是一条测试消息，收到说明推送正常。', new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })]));
   process.exit(0);
 }
 
 // ---------- 主流程 ----------
 const state = fs.existsSync(STATE) ? JSON.parse(fs.readFileSync(STATE)) : {};
 state.rooms ??= {}; state.fail ??= {};
-const firstRun = !state.initializedAt;
+const firstRun = !state.initializedAt || process.argv.includes('--list'); // --list：再发一次现有房源一览
 const events = [], errors = [];
 
 const scanned = [];
@@ -228,7 +253,8 @@ for (const [site, fn] of [['SUUMO', scanSuumo], ["HOME'S", scanHomes]]) {
   } catch (e) {
     console.error(`${site}: ${e.message}`);
     state.fail[site] = (state.fail[site] || 0) + 1;
-    if (state.fail[site] === (site === 'SUUMO' ? 3 : 24)) errors.push(`${site} 已连续 3 次失败：${e.message}`);
+    const limit = site === 'SUUMO' ? 3 : 24;
+    if (state.fail[site] === limit) errors.push(`${site} 已连续 ${limit} 次失败：${e.message}`);
   }
 }
 
@@ -267,15 +293,19 @@ for (const [k, v] of Object.entries(state.rooms)) if (now - Date.parse(v.lastSee
 
 const live = [...byKey.values()].filter((r) => r.parking.ok);
 if (firstRun) {
-  const list = live.sort((a, b) => a.total - b.total).map((r) => line(r, '在招')).join('\n\n---\n\n');
-  await push(`租房监视已启动：现有${live.length}间`, `范围：现住处约 10 分钟内（${Object.values(cfg.towns).flat().length} 个町）。以后有新房源或降价会推送。\n\n${list || '目前没有符合条件的房源。'}`);
+  live.sort((a, b) => a.total - b.total);
+  await push(`现有房源 ${live.length} 间${live.length ? `｜最低 ${man(live[0].total)}万 ${areaName(live[0])}` : ''}`,
+    introBox([`现住处约 10 分钟内（${Object.values(cfg.towns).flat().length} 个町），按 月租＋管理费 从低到高。`,
+      `停车免费 ${live.filter((r) => r.parking.fee === 0).length} 间 · 3LDK ${live.filter((r) => r.layout.startsWith('3')).length} 间。之后有新房源或降价会再推送。`]),
+    live.map((r) => card(r, '在招')));
   state.initializedAt = iso;
 } else if (events.length) {
   const news = events.filter((e) => e.tag === '新房源').length;
   const title = news ? `新房源 ${news} 间${events.length > news ? `＋降价等 ${events.length - news}` : ''}` : `降价/重新招租 ${events.length} 间`;
-  await push(title, events.map((e) => line(e.r, e.tag)).join('\n\n---\n\n'));
+  const top = events[0].r;
+  await push(`${title}｜${areaName(top)} ${top.layout} ${man(top.total)}万`, '', events.map((e) => card(e.r, e.tag)));
 }
-if (errors.length) await push('租房监视出错', errors.join('\n\n') + '\n\n网站可能改版或拦截了访问，需要修一下程序。');
+if (errors.length) await push('租房监视出错', introBox([...errors.map(h), '网站可能改版或拦截了访问，需要修一下程序。']));
 state.lastRun = iso;
 if (!dry) fs.writeFileSync(STATE, JSON.stringify(state, null, 1));
 console.log(`完成：事件 ${events.length}，错误 ${errors.length}`);

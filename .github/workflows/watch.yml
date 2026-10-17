@@ -8,6 +8,10 @@ on:
         description: "只发一条测试消息（不查房源）"
         type: boolean
         default: false
+      send_list:
+        description: "再发一次现有房源一览"
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -24,7 +28,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --omit=dev
-      - run: node watch.mjs ${{ inputs.test_push && '--test-push' || '' }}
+      - run: node watch.mjs ${{ inputs.test_push && '--test-push' || '' }} ${{ inputs.send_list && '--list' || '' }}
         env:
           WXPUSHER_TOKEN: ${{ secrets.WXPUSHER_TOKEN }}
           WXPUSHER_UID: ${{ secrets.WXPUSHER_UID }}

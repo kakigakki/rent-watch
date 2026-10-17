@@ -1,7 +1,9 @@
 name: rent-watch
 on:
   schedule:
-    - cron: "13,43 * * * *" # 每 30 分钟（UTC，GitHub 高峰期可能延迟）
+    # cron 是 UTC（日本时间 = UTC+9），GitHub 高峰期可能延迟
+    - cron: "3,23,43 23,0-12 * * *" # 日本时间 8:00–21:59 每 20 分钟
+    - cron: "13 13-22 * * *"         # 日本时间 22:00–7:59 每小时
   workflow_dispatch:
     inputs:
       test_push:

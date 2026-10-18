@@ -429,15 +429,7 @@ if (firstRun) {
   await push(title, events.length > 8 ? ['一次出现的比较多（可能是刚扩大了范围），合成一条列表。'] : [], events, { each: events.length <= 8, priority: 4 });
 }
 if (errors.length) await push('租房监视出错', [...errors, '网站可能改版或拦截了访问，需要修一下程序。'], [], { priority: 4 });
-// 临时：探测 GitHub Actions 能不能访问 at home（结果写进 state.json，公开可读）
-if (cfg.athomeProbe) {
-  try {
-    const res = await fetch('https://www.athome.co.jp/chintai/theme/madori_2ldk/kanagawa/fujisawa-city/list/', { headers: { 'User-Agent': UA, 'Accept-Language': 'ja' } });
-    const t = await res.text();
-    state.athomeProbe = { at: iso, status: res.status, bytes: t.length, hasData: t.includes('serverApp-state'), title: (t.match(/<title>([^<]*)/) || [])[1]?.slice(0, 60) || '' };
-  } catch (e) { state.athomeProbe = { at: iso, error: e.message }; }
-  console.log('at home 探测:', JSON.stringify(state.athomeProbe));
-}
+delete state.athomeProbe;
 state.lastRun = iso;
 if (!dry) fs.writeFileSync(STATE, JSON.stringify(state, null, 1));
 console.log(`完成：事件 ${events.length}，错误 ${errors.length}`);

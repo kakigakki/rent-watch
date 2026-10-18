@@ -1,6 +1,6 @@
 {
   "_comment": "towns 是现住处开车约 10 分钟内的町名（地址去掉市名后按前缀匹配，例如「辻堂」会匹配 辻堂元町/辻堂新町/辻堂東海岸…）。想扩大范围就往里加町名。",
-  "_comment_stations": "stations：交通栏里写着「〇〇駅 歩N分」且 N 在 minWalk〜maxWalk 之间的房源也算在范围内（不管在哪个町）。",
+  "_comment_stations": "stations：交通栏里写着「〇〇駅 歩N分」且 N 在 minWalk〜maxWalk 之间，或「〇〇駅 バスN分」且 N ≤ maxBus、下车后步行 ≤ maxStopWalk 的房源也算在范围内（不管在哪个町）。",
   "maxTotalYen": 150000,
   "minAreaM2": 55,
   "maxAgeYears": 15,
@@ -14,21 +14,25 @@
     {
       "name": "湘南台",
       "minWalk": 15,
-      "maxWalk": 25
+      "maxWalk": 25,
+      "maxBus": 9,
+      "maxStopWalk": 10
     }
   ],
   "suumo": {
     "sc": {
       "藤沢市": "14205",
       "茅ヶ崎市": "14207",
-      "横浜市泉区": "14116"
+      "横浜市泉区": "14116",
+      "綾瀬市": "14218"
     }
   },
   "homes": {
     "cities": {
       "藤沢市": "fujisawa-city",
       "茅ヶ崎市": "chigasaki-city",
-      "横浜市泉区": "yokohama_izumi-city"
+      "横浜市泉区": "yokohama_izumi-city",
+      "綾瀬市": "ayase-city"
     }
   },
   "forgetAfterDays": 30

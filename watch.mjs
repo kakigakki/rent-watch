@@ -73,13 +73,18 @@ const townOf = (a) => z2h(a).replace(/^神奈川県/, '').replace(/[\d-].*$/, ''
 const floorKey = (f) => { f = z2h(f); return !/\d/.test(f) || /\d+\s*-\s*\d+/.test(f) ? 'M' : f.match(/\d+/)[0]; };
 const roomKey = (r) => [townOf(r.address), z2h(r.layout).toUpperCase(), r.area?.toFixed(1), floorKey(r.floor)].join('|');
 const legacyKey = (r) => [townOf(r.address), z2h(r.layout).toUpperCase(), r.area?.toFixed(1), (z2h(r.floor).match(/\d+/) || ['?'])[0]].join('|');
-// 车站步行圈：交通栏里有「湘南台駅 歩18分」这类记载、且步行分钟在范围内
+// 车站圈：交通栏里有「湘南台駅 歩18分」且步行分钟在范围内，
+// 或「湘南台駅 バス8分 (バス停)〇〇 歩3分」且乘车、下车后步行都在上限内
 function stationMatch(r) {
   for (const st of cfg.stations || []) {
-    const re = new RegExp(`${st.name}駅?\\s*(?:歩|徒歩)\\s*(\\d+)\\s*分`);
+    const walkRe = new RegExp(`${st.name}駅?\\s*(?:歩|徒歩)\\s*(\\d+)\\s*分`);
+    const busRe = new RegExp(`${st.name}駅?\\s*バス\\s*(\\d+)\\s*分(?:.*?(?:歩|徒歩)\\s*(\\d+)\\s*分)?`);
     for (const line of r.accessAll || [r.access]) {
-      const m = z2h(line).match(re);
-      if (m && +m[1] >= st.minWalk && +m[1] <= st.maxWalk) return { name: st.name, walk: +m[1], line };
+      const t = z2h(line);
+      const w = t.match(walkRe);
+      if (w && +w[1] >= st.minWalk && +w[1] <= st.maxWalk) return { name: st.name, walk: +w[1], line };
+      const b = st.maxBus != null && t.match(busRe);
+      if (b && +b[1] <= st.maxBus && +(b[2] ?? 0) <= (st.maxStopWalk ?? 99)) return { name: st.name, bus: +b[1], line };
     }
   }
   return null;
@@ -345,7 +350,7 @@ const live = [...byKey.values()].filter((r) => r.parking.ok);
 if (firstRun) {
   live.sort((a, b) => a.total - b.total);
   await push(`现有房源 ${live.length} 间${live.length ? `｜最低 ${man(live[0].total)}万 ${areaName(live[0])}` : ''}`,
-    [`现住处约 10 分钟内（${Object.values(cfg.towns).flat().length} 个町）${(cfg.stations || []).map((st) => `＋${st.name}駅 徒歩${st.minWalk}〜${st.maxWalk}分`).join('')}，按 月租＋管理费 从低到高。`,
+    [`现住处约 10 分钟内（${Object.values(cfg.towns).flat().length} 个町）${(cfg.stations || []).map((st) => `＋${st.name}駅 徒歩${st.minWalk}〜${st.maxWalk}分${st.maxBus != null ? `或巴士${st.maxBus}分以内` : ''}`).join('')}，按 月租＋管理费 从低到高。`,
       `停车免费 ${live.filter((r) => r.parking.fee === 0).length} 间 · 3LDK ${live.filter((r) => r.layout.startsWith('3')).length} 间。之后有新房源或降价会再推送。`],
     live.map((r) => ({ r, tag: '在招' })));
   state.initializedAt = iso;

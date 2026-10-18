@@ -136,14 +136,27 @@ async function scanSuumo() {
   }
   return out;
 }
-async function suumoParking(r) {
-  const html = await get(r.url);
+// 详情页：停车费 ＋ 情報更新日 ＋ 用来比较"改了什么"的几项
+const DETAIL_FIELDS = ['駐車場', '入居', '条件', 'ほか諸費用', '備考']; // 租金变化由列表页的降价判断负责
+async function suumoDetail(url) {
+  const html = await get(url);
   if (typeof html !== 'string') return null;
   saveProbe('suumo-detail', html);
   const $ = cheerio.load(html);
-  let text = '';
-  $('th').each((_, th) => { if (!text && /駐車場/.test($(th).text())) text = $(th).next('td').text(); });
-  return parkingInfo(text);
+  const th = {};
+  $('th').each((_, el) => { const k = z2h($(el).text()).replace(/\s/g, ''); if (!(k in th)) th[k] = z2h($(el).next('td').text()); });
+  return {
+    url, parking: parkingInfo(th['駐車場'] || ''), updated: th['情報更新日'] || null, next: th['次回更新予定日'] || null,
+    fields: Object.fromEntries(DETAIL_FIELDS.map((k) => [k, (th[k] || '').slice(0, 300)])), checkedAt: now.toISOString(),
+  };
+}
+const jstDate = (s) => Date.parse(`${String(s).replace(/\//g, '-')}T00:00:00+09:00`);
+function detailDiff(a, b) {
+  const out = DETAIL_FIELDS.filter((k) => (a.fields?.[k] ?? '') !== (b.fields?.[k] ?? '')).map((k) => {
+    const x = a.fields?.[k] || '-', y = b.fields?.[k] || '-';
+    return k === '備考' || x.length + y.length > 80 ? `${k}：有改动` : `${k}：${x} → ${y}`;
+  });
+  return out;
 }
 
 // ---------- HOME'S ----------
@@ -212,7 +225,7 @@ const siteLinks = (r) => [...new Set(r.urls.map((u) => u.site))].map((site) => (
 }));
 
 // WxPusher 用的 HTML 卡片
-function card(r, tag) {
+function card(r, tag, note = '') {
   const pf = r.parking.fee;
   const park = pf == null ? `<span style="color:#a8741a">${parkText(r)}</span>` : pf === 0 ? `<b style="color:#2f7a68">${parkText(r)}</b>` : parkText(r);
   const sites = siteLinks(r).map((s) => `<a href="${h(s.url)}" style="display:inline-block;margin:6px 8px 0 0;padding:4px 12px;border:1px solid #1f5f7a;border-radius:14px;color:#1f5f7a;text-decoration:none;font-size:13px">${h(s.site)}${s.n > 1 ? ` ×${s.n}` : ''} ›</a>`).join('');
@@ -223,6 +236,7 @@ function card(r, tag) {
     + `<div style="margin:6px 0 2px"><span style="font-size:22px;font-weight:bold;color:#c0562a">${man(r.total)}</span><span style="font-size:13px;color:#c0562a">万</span>`
     + `<span style="font-size:12px;color:#5f6d68">　含停车 ${man(r.total + (pf || 0))}万</span></div>`
     + `<div style="font-size:14px"><b>${h(r.layout)}</b> · ${r.area}㎡ · ${h(r.built)} · ${h(r.floor)} · ${park}</div>`
+    + (note ? `<div style="font-size:13px;color:#1f5f7a;margin-top:6px;white-space:pre-line">${h(note)}</div>` : '')
     + sites + '</div>';
 }
 // ntfy 用的纯文本
@@ -252,27 +266,30 @@ async function wxpusher(title, html) {
 // title：通知标题；intro：说明文字（行数组）；items：[{ r, tag }]
 // each=true 时 ntfy 每套房单独一条（点通知直接打开招租页），否则合成一条列表
 async function push(title, intro = [], items = [], { each = false, priority = 3 } = {}) {
-  console.log(`\n=== ${title} ===\n${intro.join('\n')}\n${items.map((i) => `[${i.tag}] ${itemText(i.r)}`).join('\n\n')}\n`);
+  console.log(`\n=== ${title} ===\n${intro.join('\n')}\n${items.map((i) => `[${i.tag}] ${itemText(i.r)}${i.note ? `
+${i.note}` : ''}`).join('\n\n')}\n`);
   if (probe) {
     fs.mkdirSync(new URL('./probe/', import.meta.url), { recursive: true });
-    fs.writeFileSync(new URL('./probe/message.html', import.meta.url), `<meta charset="utf-8"><meta name="viewport" content="width=device-width"><body style="background:#f4f6f4;font-family:sans-serif;max-width:480px;margin:auto;padding:12px"><h3>${h(title)}</h3>${intro.map(h).join('<br>')}${items.map((i) => card(i.r, i.tag)).join('')}`);
+    fs.writeFileSync(new URL('./probe/message.html', import.meta.url), `<meta charset="utf-8"><meta name="viewport" content="width=device-width"><body style="background:#f4f6f4;font-family:sans-serif;max-width:480px;margin:auto;padding:12px"><h3>${h(title)}</h3>${intro.map(h).join('<br>')}${items.map((i) => card(i.r, i.tag, i.note)).join('')}`);
   }
   if (dry) return;
   if (!ntfyTopic && !(wxToken && wxUids.length)) { console.error('推送跳过：NTFY_TOPIC 和 WxPusher 都没有设置'); return; }
 
   if (each && items.length) {
-    for (const { r, tag } of items) {
+    for (const { r, tag, note, priority: p } of items) {
       const links = siteLinks(r);
       await ntfy({
-        title: `${tag}｜${areaName(r)} ${r.layout} ${man(r.total)}万`, message: itemText(r), priority,
+        title: `${tag}｜${areaName(r)} ${r.layout} ${man(r.total)}万`, message: itemText(r) + (note ? `
+
+${note}` : ''), priority: p ?? priority,
         click: links[0].url, actions: links.slice(0, 3).map((s) => ({ action: 'view', label: `打开 ${s.site}`, url: s.url })),
       });
     }
   } else {
     // ntfy 单条消息上限 4096 字节，超过就分条
     const chunks = [intro.join('\n')];
-    for (const { r } of items) {
-      const line = listLine(r);
+    for (const { r, tag } of items) {
+      const line = (tag && tag !== '在招' ? `【${tag}】` : '') + listLine(r);
       if (Buffer.byteLength(chunks.at(-1) + '\n\n' + line) > 3800) chunks.push(line);
       else chunks[chunks.length - 1] += (chunks.at(-1) ? '\n\n' : '') + line;
     }
@@ -281,7 +298,7 @@ async function push(title, intro = [], items = [], { each = false, priority = 3 
     }
   }
 
-  const html = `<div style="font-family:-apple-system,sans-serif;color:#1a2422"><div style="font-size:13px;color:#5f6d68;line-height:1.6">${intro.map(h).join('<br>')}</div>${items.map((i) => card(i.r, i.tag)).join('')}</div>`;
+  const html = `<div style="font-family:-apple-system,sans-serif;color:#1a2422"><div style="font-size:13px;color:#5f6d68;line-height:1.6">${intro.map(h).join('<br>')}</div>${items.map((i) => card(i.r, i.tag, i.note)).join('')}</div>`;
   await wxpusher(title, html);
 }
 if (process.argv.includes('--test-push')) {
@@ -329,20 +346,34 @@ for (const [k, r] of byKey) {
   const lk = legacyKey(r);
   if (!state.rooms[k] && state.rooms[lk]) { state.rooms[k] = state.rooms[lk]; delete state.rooms[lk]; }
   const old = state.rooms[k];
-  if (old?.parking && !(old.parking.retry && r.urls.some((u) => u.site === 'SUUMO'))) r.parking = old.parking;
+  // HOME'S 详情页有反爬验证，读不到；同一间在 SUUMO 也有时用 SUUMO 的详情页
+  const su = r.urls.find((u) => u.site === 'SUUMO');
+  let detail = old?.detail || null, fresh = null;
+  if (old?.parking && !(old.parking.retry && su)) r.parking = old.parking;
   else {
-    // HOME'S 详情页有反爬验证，读不到；同一间在 SUUMO 也有时用 SUUMO 的停车费
-    const su = r.urls.find((u) => u.site === 'SUUMO');
-    r.parking = su ? (await suumoParking({ url: su.url })) || { fee: null, ok: true, text: '未取得' }
-      : { fee: null, ok: true, text: "只在 HOME'S 上有，停车费请点开确认" };
+    fresh = su ? await suumoDetail(su.url) : null;
+    r.parking = fresh?.parking || (su ? { fee: null, ok: true, text: '未取得' } : { fee: null, ok: true, text: "只在 HOME'S 上有，停车费请点开确认" });
     if (!su) r.parking.retry = true;
   }
   if (!r.parking.ok) { state.rooms[k] = { ...(old || { firstSeen: iso }), parking: r.parking, total: r.total, lastSeen: iso, excluded: true }; continue; }
-  if (!old || old.excluded) events.push({ r, tag: '新房源' });
+  const isNew = !old || old.excluded;
+  if (isNew) events.push({ r, tag: '新房源' });
   else if (r.total < old.total) events.push({ r, tag: `降价 ${man(old.total)}→${man(r.total)}万` });
   else if (Date.parse(old.lastSeen) < now - 3 * 864e5) events.push({ r, tag: '重新招租' });
-  state.rooms[k] = { firstSeen: old?.firstSeen || iso, lastSeen: iso, total: Math.min(r.total, old?.total ?? Infinity), parking: r.parking, name: r.name, url: r.urls[0].url };
-  if (old && r.total < old.total) state.rooms[k].total = r.total;
+  else if (su) {
+    // 页面「情報更新日」变了就再推一次。每天最多查一次详情页，到了「次回更新予定日」也查
+    const due = !detail || detail.url !== su.url || now - Date.parse(detail.checkedAt) > 20 * 3600e3 || (detail.next && jstDate(detail.next) <= now);
+    if (due && !fresh) fresh = await suumoDetail(su.url);
+    if (fresh && detail?.url === su.url && fresh.updated && detail.updated && fresh.updated !== detail.updated) {
+      const diff = detailDiff(detail, fresh);
+      events.push({
+        r, tag: diff.length ? '信息更新' : '信息更新（内容没变）', priority: diff.length ? 4 : 2,
+        note: `情報更新日 ${detail.updated} → ${fresh.updated}\n${diff.length ? diff.join('\n') : '租金、停车费、入住时间等都没变，可能是中介例行刷新'}`,
+      });
+    }
+  }
+  if (fresh) detail = fresh;
+  state.rooms[k] = { firstSeen: old?.firstSeen || iso, lastSeen: iso, total: Math.min(r.total, old?.total ?? Infinity), parking: r.parking, name: r.name, url: r.urls[0].url, detail };
 }
 for (const [k, v] of Object.entries(state.rooms)) if (now - Date.parse(v.lastSeen) > cfg.forgetAfterDays * 864e5) delete state.rooms[k];
 
@@ -356,7 +387,7 @@ if (firstRun) {
   state.initializedAt = iso;
 } else if (events.length) {
   const news = events.filter((e) => e.tag === '新房源').length;
-  const title = news ? `新房源 ${news} 间${events.length > news ? `＋降价等 ${events.length - news}` : ''}` : `降价/重新招租 ${events.length} 间`;
+  const title = news ? `新房源 ${news} 间${events.length > news ? `＋其他更新 ${events.length - news}` : ''}` : `房源更新 ${events.length} 间`;
   await push(title, events.length > 8 ? ['一次出现的比较多（可能是刚扩大了范围），合成一条列表。'] : [], events, { each: events.length <= 8, priority: 4 });
 }
 if (errors.length) await push('租房监视出错', [...errors, '网站可能改版或拦截了访问，需要修一下程序。'], [], { priority: 4 });

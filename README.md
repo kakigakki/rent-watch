@@ -6,5 +6,6 @@
 - `state.json` 是已见过的房源记录，由 Actions 自动提交，不要手动改。删掉它会重新发一次"现有房源一览"。
 - 通知：GitHub Secrets 里设 `NTFY_TOPIC`（手机 ntfy App 订阅同名频道）。另外设了 `WXPUSHER_TOKEN`/`WXPUSHER_UID` 的话也会同时发到微信。
 - 本地试跑：`npm ci` 后 `node watch.mjs --dry-run`（只打印，不推送）。
+- SUUMO 详情页的「情報更新日」变了也会推送（写明改了什么；内容没变的例行刷新用低优先级静默推送）。每间每天最多查一次详情页。
 - 停车费从 SUUMO 详情页读取。HOME'S 的详情页有反爬验证读不到，只在 HOME'S 上有的房源会标"停车费请点开确认"。
 - 某个网站连续失败（SUUMO 3 次 / HOME'S 24 次）会推送一条出错通知。

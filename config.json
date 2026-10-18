@@ -17,6 +17,11 @@
       "maxWalk": 25,
       "maxBus": 9,
       "maxStopWalk": 10
+    },
+    {
+      "name": "海老名",
+      "minWalk": 0,
+      "maxWalk": 20
     }
   ],
   "suumo": {
@@ -24,7 +29,9 @@
       "藤沢市": "14205",
       "茅ヶ崎市": "14207",
       "横浜市泉区": "14116",
-      "綾瀬市": "14218"
+      "綾瀬市": "14218",
+      "海老名市": "14215",
+      "座間市": "14216"
     }
   },
   "homes": {
@@ -32,7 +39,8 @@
       "藤沢市": "fujisawa-city",
       "茅ヶ崎市": "chigasaki-city",
       "横浜市泉区": "yokohama_izumi-city",
-      "綾瀬市": "ayase-city"
+      "綾瀬市": "ayase-city",
+      "海老名市": "ebina-city"
     }
   },
   "forgetAfterDays": 30

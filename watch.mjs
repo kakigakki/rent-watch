@@ -350,7 +350,7 @@ const live = [...byKey.values()].filter((r) => r.parking.ok);
 if (firstRun) {
   live.sort((a, b) => a.total - b.total);
   await push(`现有房源 ${live.length} 间${live.length ? `｜最低 ${man(live[0].total)}万 ${areaName(live[0])}` : ''}`,
-    [`现住处约 10 分钟内（${Object.values(cfg.towns).flat().length} 个町）${(cfg.stations || []).map((st) => `＋${st.name}駅 徒歩${st.minWalk}〜${st.maxWalk}分${st.maxBus != null ? `或巴士${st.maxBus}分以内` : ''}`).join('')}，按 月租＋管理费 从低到高。`,
+    [`现住处约 10 分钟内（${Object.values(cfg.towns).flat().length} 个町）${(cfg.stations || []).map((st) => `＋${st.name}駅 徒歩${st.minWalk ? `${st.minWalk}〜${st.maxWalk}分` : `${st.maxWalk}分以内`}${st.maxBus != null ? `或巴士${st.maxBus}分以内` : ''}`).join('')}，按 月租＋管理费 从低到高。`,
       `停车免费 ${live.filter((r) => r.parking.fee === 0).length} 间 · 3LDK ${live.filter((r) => r.layout.startsWith('3')).length} 间。之后有新房源或降价会再推送。`],
     live.map((r) => ({ r, tag: '在招' })));
   state.initializedAt = iso;

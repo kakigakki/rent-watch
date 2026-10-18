@@ -226,6 +226,51 @@ async function scanHomes() {
   return out;
 }
 
+// ---------- at home（低频：每 N 小时一次，各市 2LDK/3LDK 新着顺第 1 页） ----------
+// at home 的网址只能带一个条件（间取），其他条件在这里筛。遇到验证页就跳过这一轮，不绕过
+const athomeList = (city, madori) => `https://www.athome.co.jp/chintai/theme/madori_${madori}/kanagawa/${city}/list/?SORT=33&TATEMONONUM=30`;
+// 「ＪＲ東海道本線 「辻堂」駅 徒歩13分」→「ＪＲ東海道本線 辻堂駅 徒歩13分」，好让车站圈的判断通用
+const athomeAccess = (s) => z2h(s).replace(/「([^」]+)」駅/g, '$1駅').replace(/停\s*歩/g, ' 歩');
+
+// 「2003年8月(築23年3ヶ月)」或新房只写「2026年6月」
+const athomeAge = (b) => ageOf(b) ?? ((y) => (y ? Math.max(0, now.getFullYear() - y) : null))(+((b.match(/(\d{4})年/) || [])[1] || 0));
+let athomeSortOk = true;
+async function scanAthome() {
+  const out = [];
+  for (const [cityName, city] of Object.entries(cfg.athome.cities)) {
+    for (const madori of ['2ldk', '3ldk']) {
+      await sleep(3000);
+      const html = await get(athomeList(city, madori));
+      if (typeof html !== 'string') throw new Error(`at home ${cityName} 取得失败 (${html.blocked})`);
+      if (/<title>[^<]*認証/.test(html)) throw new Error(`at home ${cityName} 返回验证页，这一轮跳过`);
+      if (madori === '2ldk') saveProbe(`athome-${city}`, html);
+      const $ = cheerio.load(html);
+      let data;
+      try {
+        const st = JSON.parse($('#serverApp-state').html() || '{}');
+        const k = Object.keys(st).find((x) => x.includes('property-list/first-view'));
+        data = JSON.parse(st[k].body).data;
+        if (!String(k).includes('"sort":"33"')) { athomeSortOk = false; console.warn(`at home ${cityName}: 新着顺排序没生效`); }
+      } catch { throw new Error(`at home ${cityName} 列表解析不到房源（页面结构可能变了）`); }
+      for (const p of data.propertyListData?.propertyList || []) {
+        const accessAll = (p.access || []).map((a) => athomeAccess(a.name));
+        const built = z2h(p.chikunengetsu);
+        for (const room of p.roomList || []) {
+          const rent = Math.round(parseFloat(z2h(room.chinryo)) * 10000) || 0;
+          const mgmt = /\d/.test(room.managementFee) ? yen(room.managementFee) : 0;
+          out.push({
+            site: 'at home', id: room.bukkenNo, url: `https://www.athome.co.jp/chintai/${room.bukkenNo}/`,
+            name: z2h(p.bukkenNm), address: z2h(p.address), access: accessAll[0] || '', accessAll,
+            built: athomeAge(built) === 0 ? '新築' : `築${athomeAge(built)}年`, age: athomeAge(built),
+            floor: z2h(room.kai), layout: z2h(room.madori), area: areaOf(room.area), rent, mgmt, total: rent + mgmt,
+          });
+        }
+      }
+    }
+  }
+  return out;
+}
+
 // ---------- 推送（ntfy 手机通知 ＋ 可选 WxPusher） ----------
 const man = (n) => (n / 10000).toFixed(2).replace(/\.?0+$/, '');
 const h = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -336,17 +381,22 @@ const events = [], errors = [];
 
 const scanned = [];
 // HOME'S 在 GitHub Actions 上一直被反爬验证拦截，默认关闭（config.homes.enabled）
-const SITES = [['SUUMO', scanSuumo], ...(cfg.homes?.enabled ? [["HOME'S", scanHomes]] : [])];
+// at home 每 cfg.athome.everyHours 小时才查一次（减少请求）
+const athomeDue = !!cfg.athome?.enabled && (!state.athomeLast || now - Date.parse(state.athomeLast) >= (cfg.athome.everyHours * 60 - 10) * 60e3);
+const SITES = [['SUUMO', scanSuumo], ...(cfg.homes?.enabled ? [["HOME'S", scanHomes]] : []), ...(athomeDue ? [['at home', scanAthome]] : [])];
 for (const [site, fn] of SITES) {
   try {
+    if (site === 'at home') state.athomeLast = now.toISOString(); // 成功失败都算一轮，失败也等下一轮
     const rows = await fn();
     console.log(`${site}: ${rows.length} 行`);
     scanned.push(...rows);
     state.fail[site] = 0;
+    if (site === 'at home') state.athomeStat = { at: now.toISOString(), rows: rows.length, inScope: rows.filter(baseOk).length, sortOk: athomeSortOk };
   } catch (e) {
     console.error(`${site}: ${e.message}`);
+    if (site === 'at home') state.athomeStat = { at: now.toISOString(), error: e.message };
     state.fail[site] = (state.fail[site] || 0) + 1;
-    const limit = site === 'SUUMO' ? 3 : 24;
+    const limit = site === 'SUUMO' ? 3 : site === 'at home' ? 8 : 24; // at home 每 3 小时一次，8 次 ≈ 1 天
     if (state.fail[site] === limit) errors.push(`${site} 已连续 ${limit} 次失败：${e.message}`);
   }
 }
@@ -388,7 +438,7 @@ for (const [k, r] of byKey) {
   if (old?.parking && !(old.parking.retry && su)) r.parking = old.parking;
   else {
     fresh = fresh || (su ? await suumoDetail(su.url) : null);
-    r.parking = fresh?.parking || (su ? { fee: null, ok: true, text: '未取得' } : { fee: null, ok: true, text: "只在 HOME'S 上有，停车费请点开确认" });
+    r.parking = fresh?.parking || (su ? { fee: null, ok: true, text: '未取得' } : { fee: null, ok: true, text: `只在 ${[...new Set(r.urls.map((u) => u.site))].join('/')} 上有，停车费请点开确认` });
     if (!su) r.parking.retry = true;
   }
   if (!r.parking.ok) { state.rooms[k] = { ...(old || { firstSeen: iso }), parking: r.parking, total: r.total, lastSeen: iso, excluded: true }; continue; }

@@ -50,5 +50,17 @@
       "海老名市": "ebina-city"
     }
   },
-  "forgetAfterDays": 30
+  "forgetAfterDays": 30,
+  "athome": {
+    "enabled": true,
+    "_comment": "低频：每 everyHours 小时一次，各市 2LDK/3LDK 新着顺第 1 页（30 栋）。遇到验证页就跳过这一轮。",
+    "everyHours": 3,
+    "cities": {
+      "藤沢市": "fujisawa-city",
+      "茅ヶ崎市": "chigasaki-city",
+      "横浜市泉区": "yokohama_izumi-city",
+      "綾瀬市": "ayase-city",
+      "海老名市": "ebina-city"
+    }
+  }
 }

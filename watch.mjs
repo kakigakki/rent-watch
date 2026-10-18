@@ -9,6 +9,7 @@ const cfg = JSON.parse(fs.readFileSync(new URL('./config.json', import.meta.url)
 const STATE = new URL('./state.json', import.meta.url);
 const dry = process.argv.includes('--dry-run');
 const probe = process.argv.includes('--probe');
+const renoOn = !!cfg.renovated?.enabled; // 筑年数超出的房源，写明最近翻新过也算
 const ntfyServer = process.env.NTFY_SERVER || 'https://ntfy.sh';
 const ntfyTopic = process.env.NTFY_TOPIC;
 const wxToken = process.env.WXPUSHER_TOKEN;
@@ -90,11 +91,12 @@ function stationMatch(r) {
   return null;
 }
 const inScope = (r) => townOk(r.address) || !!stationMatch(r);
-const baseOk = (r) => r.total <= cfg.maxTotalYen && r.area >= cfg.minAreaM2 && r.age != null && r.age <= cfg.maxAgeYears
+// 筑年数在合并时另外判断（超出的还要看有没有翻新）
+const baseOk = (r) => r.total <= cfg.maxTotalYen && r.area >= cfg.minAreaM2 && r.age != null
   && cfg.layouts.includes(z2h(r.layout).toUpperCase()) && inScope(r);
 
 // ---------- SUUMO ----------
-const suumoList = (sc, page) => `https://suumo.jp/jj/chintai/ichiran/FR301FC001/?ar=030&bs=040&ta=14&sc=${sc}&cb=0.0&ct=${(cfg.maxTotalYen / 10000).toFixed(1)}&co=1&et=9999999&md=07&md=10&mb=${cfg.minAreaM2}&mt=9999999&cn=${cfg.maxAgeYears}&tc=0400901&shkr1=03&shkr2=03&shkr3=03&shkr4=03&pc=50&page=${page}`;
+const suumoList = (sc, page) => `https://suumo.jp/jj/chintai/ichiran/FR301FC001/?ar=030&bs=040&ta=14&sc=${sc}&cb=0.0&ct=${(cfg.maxTotalYen / 10000).toFixed(1)}&co=1&et=9999999&md=07&md=10&mb=${cfg.minAreaM2}&mt=9999999&cn=${renoOn ? 9999999 : cfg.maxAgeYears}&tc=0400901&shkr1=03&shkr2=03&shkr3=03&shkr4=03&pc=50&page=${page}`;
 
 async function scanSuumo() {
   const out = [];
@@ -147,9 +149,24 @@ async function suumoDetail(url) {
   $('th').each((_, el) => { const k = z2h($(el).text()).replace(/\s/g, ''); if (!(k in th)) th[k] = z2h($(el).next('td').text()); });
   return {
     url, parking: parkingInfo(th['駐車場'] || ''), updated: th['情報更新日'] || null, next: th['次回更新予定日'] || null,
+    reno: parseReno($('ul.inline_list li').map((_, li) => z2h($(li).text())).get(), th['備考'] || ''),
     fields: Object.fromEntries(DETAIL_FIELDS.map((k) => [k, (th[k] || '').slice(0, 300)])), checkedAt: now.toISOString(),
   };
 }
+// 翻新：「部屋の特徴・設備」里的「リフォーム：2023年2月内装：…」优先；没有就看设备、备注里有没有「リノベーション」等字样
+function parseReno(features, note) {
+  const f = features.find((t) => /^リフォーム\s*[：:]/.test(t));
+  if (f) {
+    const body = f.replace(/^リフォーム\s*[：:]\s*/, '');
+    const years = [...body.matchAll(/(\d{4})\s*年/g)].map((m) => +m[1]);
+    // 后面常接着保证公司、消毒费之类的说明，截掉
+    const text = body.split(/(?:保証|敷金|礼金|消毒|鍵交換|。)/)[0].replace(/[/、\s]+$/, '').slice(0, 50);
+    return { year: years.length ? Math.max(...years) : null, text, planned: /予定/.test(body) };
+  }
+  const m = [...features, note].join('、').match(/フルリノベーション|リノベーション済?|リノベ済|フルリフォーム|内装リフォーム済|リフォーム済/);
+  return m ? { year: null, text: `${m[0]}（年份未写）`, planned: false } : null;
+}
+const renoOk = (reno) => !!reno && (reno.year == null || reno.year >= now.getFullYear() - (cfg.renovated?.withinYears ?? 5));
 const jstDate = (s) => Date.parse(`${String(s).replace(/\//g, '-')}T00:00:00+09:00`);
 function detailDiff(a, b) {
   const out = DETAIL_FIELDS.filter((k) => (a.fields?.[k] ?? '') !== (b.fields?.[k] ?? '')).map((k) => {
@@ -163,7 +180,7 @@ function detailDiff(a, b) {
 // cond: 賃料上限(管理費込) / 2LDK=25 3LDK=35 / 55㎡以上 / 築15年以内 / 駐車場あり=320801
 const homesList = (city, page) => `https://www.homes.co.jp/chintai/kanagawa/${city}/list/?` + new URLSearchParams({
   'cond[monthmoneyroomh]': String(cfg.maxTotalYen / 10000), 'cond[kanrihi]': '1', 'cond[madori][25]': '25', 'cond[madori][35]': '35',
-  'cond[housearea]': String(cfg.minAreaM2), 'cond[houseageh]': String(cfg.maxAgeYears), 'cond[mcf][320801]': '320801', page: String(page),
+  'cond[housearea]': String(cfg.minAreaM2), 'cond[houseageh]': String(renoOn ? 0 : cfg.maxAgeYears), 'cond[mcf][320801]': '320801', page: String(page),
 });
 
 async function scanHomes() {
@@ -236,13 +253,18 @@ function card(r, tag, note = '') {
     + `<div style="margin:6px 0 2px"><span style="font-size:22px;font-weight:bold;color:#c0562a">${man(r.total)}</span><span style="font-size:13px;color:#c0562a">万</span>`
     + `<span style="font-size:12px;color:#5f6d68">　含停车 ${man(r.total + (pf || 0))}万</span></div>`
     + `<div style="font-size:14px"><b>${h(r.layout)}</b> · ${r.area}㎡ · ${h(r.built)} · ${h(r.floor)} · ${park}</div>`
+    + (r.reno ? `<div style="font-size:13px;color:#2f7a68;margin-top:4px">${h(renoText(r))}</div>` : '')
     + (note ? `<div style="font-size:13px;color:#1f5f7a;margin-top:6px;white-space:pre-line">${h(note)}</div>` : '')
     + sites + '</div>';
 }
 // ntfy 用的纯文本
+// 1981 年 6 月以前开工的楼是旧抗震标准；筑年数够老的提醒一下（只按年份粗判）
+const oldQuake = (r) => r.age != null && now.getFullYear() - r.age <= 1981;
+const renoText = (r) => (r.reno ? `翻新：${r.reno.planned ? '（预定）' : ''}${r.reno.text}${oldQuake(r) ? '\n⚠ 建于 1981 年前后或更早，可能是旧抗震标准，签约前问一下' : ''}` : '');
 const itemText = (r) => `${displayName(r)}\n${z2h(r.address).replace(/^神奈川県/, '')} · ${shortAccess(accessLine(r))}\n`
-  + `${r.layout} ${r.area}㎡ · ${r.built} · ${r.floor}\n月租+管理费 ${man(r.total)}万（含停车 ${man(r.total + (r.parking.fee || 0))}万）· ${parkText(r)}`;
-const listLine = (r) => `${man(r.total)}万 ${areaName(r)} ${r.layout} ${Math.round(r.area)}㎡ ${r.built} · ${parkText(r)}\n${siteLinks(r)[0].url}`;
+  + `${r.layout} ${r.area}㎡ · ${r.built} · ${r.floor}\n月租+管理费 ${man(r.total)}万（含停车 ${man(r.total + (r.parking.fee || 0))}万）· ${parkText(r)}`
+  + (r.reno ? `\n${renoText(r)}` : '');
+const listLine = (r) => `${man(r.total)}万 ${areaName(r)} ${r.layout} ${Math.round(r.area)}㎡ ${r.built}${r.reno ? '（翻新）' : ''} · ${parkText(r)}\n${siteLinks(r)[0].url}`;
 
 async function ntfy(msg) {
   if (!ntfyTopic) return;
@@ -308,7 +330,7 @@ if (process.argv.includes('--test-push')) {
 
 // ---------- 主流程 ----------
 const state = fs.existsSync(STATE) ? JSON.parse(fs.readFileSync(STATE)) : {};
-state.rooms ??= {}; state.fail ??= {};
+state.rooms ??= {}; state.fail ??= {}; state.reno ??= {};
 const firstRun = !state.initializedAt || process.argv.includes('--list'); // --list：再发一次现有房源一览
 const events = [], errors = [];
 
@@ -329,7 +351,7 @@ for (const [site, fn] of [['SUUMO', scanSuumo], ["HOME'S", scanHomes]]) {
 
 // 按房间合并
 const byKey = new Map();
-for (const r of scanned.filter(baseOk)) {
+for (const r of scanned.filter((r) => baseOk(r) && (r.age <= cfg.maxAgeYears || renoOn))) {
   const k = roomKey(r);
   const cur = byKey.get(k);
   if (!cur) byKey.set(k, { ...r, urls: [{ site: r.site, url: r.url }] });
@@ -338,7 +360,7 @@ for (const r of scanned.filter(baseOk)) {
     if (r.total < cur.total) Object.assign(cur, { ...r, urls: cur.urls });
   }
 }
-console.log(`范围内符合条件：${byKey.size} 间`);
+console.log(`范围内候选（含筑年数超出的）：${byKey.size} 间`);
 
 const iso = now.toISOString();
 for (const [k, r] of byKey) {
@@ -349,15 +371,27 @@ for (const [k, r] of byKey) {
   // HOME'S 详情页有反爬验证，读不到；同一间在 SUUMO 也有时用 SUUMO 的详情页
   const su = r.urls.find((u) => u.site === 'SUUMO');
   let detail = old?.detail || null, fresh = null;
+  if (r.age > cfg.maxAgeYears) {
+    // 超过筑年数的：只有 SUUMO 详情页写明了最近翻新才算。结果缓存 7 天，避免每次都读详情页
+    if (!su) continue;
+    let c = state.reno[su.url];
+    if (!c || now - Date.parse(c.checkedAt) > 7 * 864e5) {
+      fresh = await suumoDetail(su.url);
+      if (!fresh) continue;
+      c = state.reno[su.url] = { reno: fresh.reno, checkedAt: iso };
+    }
+    if (!renoOk(c.reno)) continue;
+    r.reno = c.reno;
+  }
   if (old?.parking && !(old.parking.retry && su)) r.parking = old.parking;
   else {
-    fresh = su ? await suumoDetail(su.url) : null;
+    fresh = fresh || (su ? await suumoDetail(su.url) : null);
     r.parking = fresh?.parking || (su ? { fee: null, ok: true, text: '未取得' } : { fee: null, ok: true, text: "只在 HOME'S 上有，停车费请点开确认" });
     if (!su) r.parking.retry = true;
   }
   if (!r.parking.ok) { state.rooms[k] = { ...(old || { firstSeen: iso }), parking: r.parking, total: r.total, lastSeen: iso, excluded: true }; continue; }
   const isNew = !old || old.excluded;
-  if (isNew) events.push({ r, tag: '新房源' });
+  if (isNew) events.push({ r, tag: r.reno ? '新房源（翻新）' : '新房源' });
   else if (r.total < old.total) events.push({ r, tag: `降价 ${man(old.total)}→${man(r.total)}万` });
   else if (Date.parse(old.lastSeen) < now - 3 * 864e5) events.push({ r, tag: '重新招租' });
   else if (su) {
@@ -376,8 +410,10 @@ for (const [k, r] of byKey) {
   state.rooms[k] = { firstSeen: old?.firstSeen || iso, lastSeen: iso, total: Math.min(r.total, old?.total ?? Infinity), parking: r.parking, name: r.name, url: r.urls[0].url, detail };
 }
 for (const [k, v] of Object.entries(state.rooms)) if (now - Date.parse(v.lastSeen) > cfg.forgetAfterDays * 864e5) delete state.rooms[k];
+for (const [k, v] of Object.entries(state.reno)) if (now - Date.parse(v.checkedAt) > cfg.forgetAfterDays * 864e5) delete state.reno[k];
 
-const live = [...byKey.values()].filter((r) => r.parking.ok);
+const live = [...byKey.values()].filter((r) => r.parking?.ok); // 超出筑年数又没翻新的在上面已跳过（没有 parking）
+console.log(`最终符合条件：${live.length} 间（其中翻新 ${live.filter((r) => r.reno).length}）`);
 if (firstRun) {
   live.sort((a, b) => a.total - b.total);
   await push(`现有房源 ${live.length} 间${live.length ? `｜最低 ${man(live[0].total)}万 ${areaName(live[0])}` : ''}`,

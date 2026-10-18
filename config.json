@@ -4,6 +4,11 @@
   "maxTotalYen": 150000,
   "minAreaM2": 55,
   "maxAgeYears": 15,
+  "_comment_renovated": "renovated：筑年数超过 maxAgeYears 的房源，SUUMO 详情页写明 withinYears 年内翻新过（或写了リノベーション等字样、没写年份）也算。",
+  "renovated": {
+    "enabled": true,
+    "withinYears": 5
+  },
   "layouts": ["2LDK", "2SLDK", "3LDK", "3SLDK"],
   "maxParkingYen": 12000,
   "towns": {

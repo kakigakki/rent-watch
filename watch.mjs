@@ -335,7 +335,9 @@ const firstRun = !state.initializedAt || process.argv.includes('--list'); // --l
 const events = [], errors = [];
 
 const scanned = [];
-for (const [site, fn] of [['SUUMO', scanSuumo], ["HOME'S", scanHomes]]) {
+// HOME'S 在 GitHub Actions 上一直被反爬验证拦截，默认关闭（config.homes.enabled）
+const SITES = [['SUUMO', scanSuumo], ...(cfg.homes?.enabled ? [["HOME'S", scanHomes]] : [])];
+for (const [site, fn] of SITES) {
   try {
     const rows = await fn();
     console.log(`${site}: ${rows.length} 行`);

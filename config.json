@@ -40,6 +40,8 @@
     }
   },
   "homes": {
+    "enabled": false,
+    "_comment": "在 GitHub Actions 上一直被反爬验证拦截（2026-10-18 起连续失败），所以关闭。本机运行时可改成 true。",
     "cities": {
       "藤沢市": "fujisawa-city",
       "茅ヶ崎市": "chigasaki-city",

@@ -69,9 +69,24 @@ function parkingInfo(text) {
 // 同一房间在多个网站/多家中介重复挂牌 → 町名+间取+面积+楼层 作为键
 // （SUUMO 地址只到丁目、HOME'S 写到番地，数字部分对不上，所以只取町名）
 const townOf = (a) => z2h(a).replace(/^神奈川県/, '').replace(/[\d-].*$/, '').replace(/丁目$/, '');
-const roomKey = (r) => [townOf(r.address), z2h(r.layout).toUpperCase(), r.area?.toFixed(1), (z2h(r.floor).match(/\d+/) || ['?'])[0]].join('|');
+// 楼层：「1-2階」（复式/联排）和没写楼层的不区分，统一记成 M
+const floorKey = (f) => { f = z2h(f); return !/\d/.test(f) || /\d+\s*-\s*\d+/.test(f) ? 'M' : f.match(/\d+/)[0]; };
+const roomKey = (r) => [townOf(r.address), z2h(r.layout).toUpperCase(), r.area?.toFixed(1), floorKey(r.floor)].join('|');
+const legacyKey = (r) => [townOf(r.address), z2h(r.layout).toUpperCase(), r.area?.toFixed(1), (z2h(r.floor).match(/\d+/) || ['?'])[0]].join('|');
+// 车站步行圈：交通栏里有「湘南台駅 歩18分」这类记载、且步行分钟在范围内
+function stationMatch(r) {
+  for (const st of cfg.stations || []) {
+    const re = new RegExp(`${st.name}駅?\\s*(?:歩|徒歩)\\s*(\\d+)\\s*分`);
+    for (const line of r.accessAll || [r.access]) {
+      const m = z2h(line).match(re);
+      if (m && +m[1] >= st.minWalk && +m[1] <= st.maxWalk) return { name: st.name, walk: +m[1], line };
+    }
+  }
+  return null;
+}
+const inScope = (r) => townOk(r.address) || !!stationMatch(r);
 const baseOk = (r) => r.total <= cfg.maxTotalYen && r.area >= cfg.minAreaM2 && r.age != null && r.age <= cfg.maxAgeYears
-  && cfg.layouts.includes(z2h(r.layout).toUpperCase()) && townOk(r.address);
+  && cfg.layouts.includes(z2h(r.layout).toUpperCase()) && inScope(r);
 
 // ---------- SUUMO ----------
 const suumoList = (sc, page) => `https://suumo.jp/jj/chintai/ichiran/FR301FC001/?ar=030&bs=040&ta=14&sc=${sc}&cb=0.0&ct=${(cfg.maxTotalYen / 10000).toFixed(1)}&co=1&et=9999999&md=07&md=10&mb=${cfg.minAreaM2}&mt=9999999&cn=${cfg.maxAgeYears}&tc=0400901&shkr1=03&shkr2=03&shkr3=03&shkr4=03&pc=50&page=${page}`;
@@ -104,7 +119,7 @@ async function scanSuumo() {
           const rent = yen(row.find('.cassetteitem_price--rent').text());
           const mgmt = yen(row.find('.cassetteitem_price--administration').text());
           out.push({
-            site: 'SUUMO', id, url: `https://suumo.jp/chintai/${id}/`, name, address, access: access[0] || '',
+            site: 'SUUMO', id, url: `https://suumo.jp/chintai/${id}/`, name, address, access: access[0] || '', accessAll: access,
             built: col3[0] || '', age: ageOf(col3[0]), floor: tds.find((t) => /階/.test(t) && t.length < 12) || '',
             layout: z2h(row.find('.cassetteitem_madori').text()), area: areaOf(row.find('.cassetteitem_menseki').text()),
             rent, mgmt, total: rent + mgmt,
@@ -152,6 +167,7 @@ async function scanHomes() {
         b.find('.bukkenSpec tr').each((_, tr) => { spec[z2h($(tr).find('th').text())] = z2h($(tr).find('td').text()); });
         const name = z2h(b.find('.bukkenName').first().text());
         const built = (spec['築年数/階数'] || '').split('/')[0].trim();
+        const accessAll = b.find('.bukkenSpec .prg-stationText').map((_, e) => z2h($(e).text())).get();
         b.find('tr.prg-roomInfo').each((_, tr) => {
           const row = $(tr);
           const url = row.attr('data-href') || row.find('a[href*="/chintai/room/"]').attr('href') || '';
@@ -164,7 +180,7 @@ async function scanHomes() {
           const rent = yen(rentTxt), mgmt = yen(mgmtTxt);
           out.push({
             site: "HOME'S", id, url: `https://www.homes.co.jp/chintai/room/${id}/`, name, address: spec['所在地'] || '',
-            access: spec['交通'] || '', built, age: ageOf(built), floor: z2h(row.find('.roomKaisuu').text()),
+            access: accessAll[0] || spec['交通'] || '', accessAll, built, age: ageOf(built), floor: z2h(row.find('.roomKaisuu').text()),
             layout, area: areaOf(areaTxt), rent, mgmt, total: rent + mgmt,
           });
         });
@@ -180,9 +196,11 @@ const man = (n) => (n / 10000).toFixed(2).replace(/\.?0+$/, '');
 const h = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const TAG_COLOR = { 新房源: '#2f7a68', 在招: '#5f6d68', 重新招租: '#1f5f7a' }; // 其他（降价）= 橙色
 // 「JR東海道本線 辻堂駅 2階建 築14年」这类是中介没写楼名时 SUUMO 自动生成的标题
-const displayName = (r) => (/駅 \d+階建|^\S+線 \S+駅/.test(r.name) ? '（楼名未公开）' : r.name);
+const displayName = (r) => (/駅 (地上)?\d+階建|^\S+線 \S+駅/.test(r.name) ? '（楼名未公开）' : r.name);
 const shortAccess = (a) => z2h(a).replace(/^[^/]*\//, '').replace(/\(バス停\)/, '').replace(/\s*（.*$/, '');
-const areaName = (r) => townOf(r.address).replace(/^.+?[市町]/, '');
+// 只因为车站步行圈才进范围的房源，标题前加「湘南台圈」
+const areaName = (r) => (townOk(r.address) ? '' : `${stationMatch(r)?.name}圈 `) + townOf(r.address).replace(/^.+?[市町区]/, '');
+const accessLine = (r) => (!townOk(r.address) && stationMatch(r)?.line) || r.access;
 const parkText = (r) => (r.parking.fee == null ? '停车费待确认' : r.parking.fee === 0 ? '停车免费' : `停车 ${r.parking.fee.toLocaleString()}円`);
 const siteLinks = (r) => [...new Set(r.urls.map((u) => u.site))].map((site) => ({
   site, n: r.urls.filter((u) => u.site === site).length, url: r.urls.find((u) => u.site === site).url,
@@ -196,14 +214,14 @@ function card(r, tag) {
   return `<div style="border:1px solid #dde3dd;border-radius:10px;padding:10px 12px;margin:10px 0;background:#fff">`
     + `<div style="font-size:12px;font-weight:bold;color:${TAG_COLOR[tag] || '#c0562a'}">${h(tag)}</div>`
     + `<div style="font-size:16px;font-weight:bold;margin:2px 0">${h(displayName(r))}</div>`
-    + `<div style="font-size:12px;color:#5f6d68">${h(z2h(r.address).replace(/^神奈川県/, ''))}　${h(shortAccess(r.access))}</div>`
+    + `<div style="font-size:12px;color:#5f6d68">${h(z2h(r.address).replace(/^神奈川県/, ''))}　${h(shortAccess(accessLine(r)))}</div>`
     + `<div style="margin:6px 0 2px"><span style="font-size:22px;font-weight:bold;color:#c0562a">${man(r.total)}</span><span style="font-size:13px;color:#c0562a">万</span>`
     + `<span style="font-size:12px;color:#5f6d68">　含停车 ${man(r.total + (pf || 0))}万</span></div>`
     + `<div style="font-size:14px"><b>${h(r.layout)}</b> · ${r.area}㎡ · ${h(r.built)} · ${h(r.floor)} · ${park}</div>`
     + sites + '</div>';
 }
 // ntfy 用的纯文本
-const itemText = (r) => `${displayName(r)}\n${z2h(r.address).replace(/^神奈川県/, '')} · ${shortAccess(r.access)}\n`
+const itemText = (r) => `${displayName(r)}\n${z2h(r.address).replace(/^神奈川県/, '')} · ${shortAccess(accessLine(r))}\n`
   + `${r.layout} ${r.area}㎡ · ${r.built} · ${r.floor}\n月租+管理费 ${man(r.total)}万（含停车 ${man(r.total + (r.parking.fee || 0))}万）· ${parkText(r)}`;
 const listLine = (r) => `${man(r.total)}万 ${areaName(r)} ${r.layout} ${Math.round(r.area)}㎡ ${r.built} · ${parkText(r)}\n${siteLinks(r)[0].url}`;
 
@@ -302,6 +320,9 @@ console.log(`范围内符合条件：${byKey.size} 间`);
 
 const iso = now.toISOString();
 for (const [k, r] of byKey) {
+  // 旧版键（楼层按数字区分）迁移过来，避免改键后被当成新房源
+  const lk = legacyKey(r);
+  if (!state.rooms[k] && state.rooms[lk]) { state.rooms[k] = state.rooms[lk]; delete state.rooms[lk]; }
   const old = state.rooms[k];
   if (old?.parking && !(old.parking.retry && r.urls.some((u) => u.site === 'SUUMO'))) r.parking = old.parking;
   else {
@@ -324,14 +345,14 @@ const live = [...byKey.values()].filter((r) => r.parking.ok);
 if (firstRun) {
   live.sort((a, b) => a.total - b.total);
   await push(`现有房源 ${live.length} 间${live.length ? `｜最低 ${man(live[0].total)}万 ${areaName(live[0])}` : ''}`,
-    [`现住处约 10 分钟内（${Object.values(cfg.towns).flat().length} 个町），按 月租＋管理费 从低到高。`,
+    [`现住处约 10 分钟内（${Object.values(cfg.towns).flat().length} 个町）${(cfg.stations || []).map((st) => `＋${st.name}駅 徒歩${st.minWalk}〜${st.maxWalk}分`).join('')}，按 月租＋管理费 从低到高。`,
       `停车免费 ${live.filter((r) => r.parking.fee === 0).length} 间 · 3LDK ${live.filter((r) => r.layout.startsWith('3')).length} 间。之后有新房源或降价会再推送。`],
     live.map((r) => ({ r, tag: '在招' })));
   state.initializedAt = iso;
 } else if (events.length) {
   const news = events.filter((e) => e.tag === '新房源').length;
   const title = news ? `新房源 ${news} 间${events.length > news ? `＋降价等 ${events.length - news}` : ''}` : `降价/重新招租 ${events.length} 间`;
-  await push(title, [], events, { each: true, priority: 4 });
+  await push(title, events.length > 8 ? ['一次出现的比较多（可能是刚扩大了范围），合成一条列表。'] : [], events, { each: events.length <= 8, priority: 4 });
 }
 if (errors.length) await push('租房监视出错', [...errors, '网站可能改版或拦截了访问，需要修一下程序。'], [], { priority: 4 });
 state.lastRun = iso;

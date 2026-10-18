@@ -234,15 +234,26 @@ const athomeAccess = (s) => z2h(s).replace(/「([^」]+)」駅/g, '$1駅').repla
 
 // 「2003年8月(築23年3ヶ月)」或新房只写「2026年6月」
 const athomeAge = (b) => ageOf(b) ?? ((y) => (y ? Math.max(0, now.getFullYear() - y) : null))(+((b.match(/(\d{4})年/) || [])[1] || 0));
-let athomeSortOk = true;
+let athomeSortOk = true, athomeDone = [];
 async function scanAthome() {
   const out = [];
-  for (const [cityName, city] of Object.entries(cfg.athome.cities)) {
-    for (const madori of ['2ldk', '3ldk']) {
-      await sleep(3000);
+  // 每轮从不同的城市开始：被验证页挡住时，不会总是同一批城市轮不到
+  const all = Object.entries(cfg.athome.cities).flatMap(([n, c]) => ['2ldk', '3ldk'].map((m) => [n, c, m]));
+  const start = (state.athomeCursor || 0) % all.length;
+  const jobs = [...all.slice(start), ...all.slice(0, start)];
+  for (const [i, [cityName, city, madori]] of jobs.entries()) {
+    {
+      if (i) await sleep((cfg.athome.intervalSec ?? 10) * 1000);
       const html = await get(athomeList(city, madori));
-      if (typeof html !== 'string') throw new Error(`at home ${cityName} 取得失败 (${html.blocked})`);
-      if (/<title>[^<]*認証/.test(html)) throw new Error(`at home ${cityName} 返回验证页，这一轮跳过`);
+      const blocked = typeof html !== 'string' || /<title>[^<]*認証/.test(html);
+      if (blocked) {
+        // 遇到验证页就停，已经抓到的保留，下一轮从这里接着
+        state.athomeCursor = (start + i) % all.length;
+        if (!out.length) throw new Error(`at home ${cityName} 返回验证页，这一轮跳过`);
+        console.warn(`at home: ${cityName} ${madori} 返回验证页，后面的这一轮不抓了`);
+        return out;
+      }
+      athomeDone.push(`${cityName}${madori}`);
       if (madori === '2ldk') saveProbe(`athome-${city}`, html);
       const $ = cheerio.load(html);
       let data;
@@ -268,6 +279,7 @@ async function scanAthome() {
       }
     }
   }
+  state.athomeCursor = (start + jobs.length) % all.length;
   return out;
 }
 
@@ -391,7 +403,7 @@ for (const [site, fn] of SITES) {
     console.log(`${site}: ${rows.length} 行`);
     scanned.push(...rows);
     state.fail[site] = 0;
-    if (site === 'at home') state.athomeStat = { at: now.toISOString(), rows: rows.length, inScope: rows.filter(baseOk).length, sortOk: athomeSortOk };
+    if (site === 'at home') state.athomeStat = { at: now.toISOString(), rows: rows.length, inScope: rows.filter(baseOk).length, sortOk: athomeSortOk, done: athomeDone };
   } catch (e) {
     console.error(`${site}: ${e.message}`);
     if (site === 'at home') state.athomeStat = { at: now.toISOString(), error: e.message };

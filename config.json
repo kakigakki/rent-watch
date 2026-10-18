@@ -15,7 +15,7 @@
       "name": "湘南台",
       "minWalk": 15,
       "maxWalk": 25,
-      "maxBus": 9,
+      "maxBus": 5,
       "maxStopWalk": 10
     },
     {

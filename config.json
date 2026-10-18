@@ -50,5 +50,6 @@
       "海老名市": "ebina-city"
     }
   },
-  "forgetAfterDays": 30
+  "forgetAfterDays": 30,
+  "athomeProbe": true
 }

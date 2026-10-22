@@ -1528,12 +1528,12 @@
   }
  },
  "fail": {
-  "SUUMO": 48,
+  "SUUMO": 49,
   "HOME'S": 34,
-  "at home": 16
+  "at home": 17
  },
  "initializedAt": "2026-10-17T02:28:14.219Z",
- "lastRun": "2026-10-22T04:43:22.276Z",
+ "lastRun": "2026-10-22T05:03:19.747Z",
  "reno": {
   "https://suumo.jp/chintai/jnc_000110518390/": {
    "reno": null,
@@ -2240,9 +2240,9 @@
    "checkedAt": "2026-10-21T03:03:15.100Z"
   }
  },
- "athomeLast": "2026-10-22T02:03:19.901Z",
+ "athomeLast": "2026-10-22T05:03:19.747Z",
  "athomeStat": {
-  "at": "2026-10-22T02:03:19.901Z",
+  "at": "2026-10-22T05:03:19.747Z",
   "error": "at home 海老名市 返回验证页，这一轮跳过"
  },
  "athomeCursor": 9

@@ -1528,12 +1528,12 @@
   }
  },
  "fail": {
-  "SUUMO": 55,
+  "SUUMO": 56,
   "HOME'S": 34,
   "at home": 17
  },
  "initializedAt": "2026-10-17T02:28:14.219Z",
- "lastRun": "2026-10-22T06:43:15.066Z",
+ "lastRun": "2026-10-22T07:03:16.321Z",
  "reno": {
   "https://suumo.jp/chintai/jnc_000110518390/": {
    "reno": null,

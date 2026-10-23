@@ -1656,12 +1656,12 @@
   }
  },
  "fail": {
-  "SUUMO": 0,
+  "SUUMO": 1,
   "HOME'S": 34,
-  "at home": 27
+  "at home": 28
  },
  "initializedAt": "2026-10-17T02:28:14.219Z",
- "lastRun": "2026-10-23T13:43:14.704Z",
+ "lastRun": "2026-10-23T14:03:18.949Z",
  "reno": {
   "https://suumo.jp/chintai/jnc_000110518390/": {
    "reno": null,
@@ -2412,9 +2412,9 @@
    "checkedAt": "2026-10-23T12:03:16.798Z"
   }
  },
- "athomeLast": "2026-10-23T11:03:17.004Z",
+ "athomeLast": "2026-10-23T14:03:18.949Z",
  "athomeStat": {
-  "at": "2026-10-23T11:03:17.004Z",
+  "at": "2026-10-23T14:03:18.949Z",
   "error": "at home 海老名市 列表解析不到房源（页面结构可能变了）"
  },
  "athomeCursor": 9
